@@ -71,6 +71,9 @@ ARG RESTY_CONFIG_OPTIONS="\
     --with-stream_ssl_module \
     --with-stream_ssl_preread_module \
     --with-threads \
+    --add-module=/tmp/nginx-module-vts \
+    --add-module=/tmp/nginx-module-sts \
+    --add-module=/tmp/nginx-module-stream-sts \
     "
 ARG RESTY_CONFIG_OPTIONS_MORE=""
 ARG RESTY_LUAJIT_OPTIONS="--with-luajit-xcflags='-DLUAJIT_NUMMODE=2 -DLUAJIT_ENABLE_LUA52COMPAT'"
@@ -132,6 +135,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
         zlib1g-dev \
         ${RESTY_ADD_PACKAGE_BUILDDEPS} \
         ${RESTY_ADD_PACKAGE_RUNDEPS} \
+        git \
     && cd /tmp \
     && if [ -n "${RESTY_EVAL_PRE_CONFIGURE}" ]; then eval $(echo ${RESTY_EVAL_PRE_CONFIGURE}); fi \
     && curl -fSL "${RESTY_OPENSSL_URL_BASE}/openssl-${RESTY_OPENSSL_VERSION}.tar.gz" -o openssl-${RESTY_OPENSSL_VERSION}.tar.gz \
@@ -169,6 +173,15 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
         ${RESTY_PCRE_BUILD_OPTIONS} \
     && CFLAGS="-g -O3" make -j${RESTY_J} \
     && CFLAGS="-g -O3" make -j${RESTY_J} install \
+    #prepare nginx-module-vts
+    && cd /tmp \
+    && git clone https://github.com/vozlt/nginx-module-vts \
+    #prepare nginx-module-sts
+    && cd /tmp \
+    && git clone https://github.com/vozlt/nginx-module-sts \
+    #prepare nginx-module-stream-sts
+    && cd /tmp \
+    && git clone https://github.com/vozlt/nginx-module-stream-sts \
     && cd /tmp \
     && curl -fSL https://openresty.org/download/openresty-${RESTY_VERSION}.tar.gz -o openresty-${RESTY_VERSION}.tar.gz \
     && tar xzf openresty-${RESTY_VERSION}.tar.gz \
@@ -192,7 +205,14 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
         --with-lua-include=/usr/local/openresty/luajit/include/luajit-2.1 \
     && make build \
     && make install \
+    #lua-resty-balancer
     && cd /tmp \
+    && git clone https://github.com/openresty/lua-resty-balancer \
+    && cd lua-resty-balancer \
+    && make \
+    && make install \
+    && cd /tmp \
+    && rm -rf ./* \
     && if [ -n "${RESTY_EVAL_POST_MAKE}" ]; then eval $(echo ${RESTY_EVAL_POST_MAKE}); fi \
     && rm -rf luarocks-${RESTY_LUAROCKS_VERSION} luarocks-${RESTY_LUAROCKS_VERSION}.tar.gz \
     && if [ -n "${RESTY_ADD_PACKAGE_BUILDDEPS}" ]; then DEBIAN_FRONTEND=noninteractive apt-get remove -y --purge ${RESTY_ADD_PACKAGE_BUILDDEPS} ; fi \
