@@ -11,7 +11,7 @@ LABEL maintainer="Evan Wies <evan@neomantra.net>"
 # Docker Build Arguments
 ARG RESTY_IMAGE_BASE="debian"
 ARG RESTY_IMAGE_TAG="trixie-slim"
-ARG RESTY_VERSION="v1.31.8.1" # Includes the full branch name, hence 'v' prefix
+ARG RESTY_VERSION="master" # Includes the full branch name, hence 'v' prefix
 ARG RESTY_SOURCE_REPO="https://github.com/openresty/openresty.git"
 ARG RESTY_LUAROCKS_VERSION="3.13.0"
 
@@ -73,7 +73,7 @@ ARG RESTY_CONFIG_OPTIONS="\
     --with-stream_ssl_preread_module \
     --with-threads \
     "
-ARG RESTY_CONFIG_OPTIONS_MORE=""
+ARG RESTY_CONFIG_OPTIONS_MORE="--add-module=/tmp/nginx-module-vts --add-module=/tmp/nginx-module-sts --add-module=/tmp/nginx-module-stream-sts"
 ARG RESTY_LUAJIT_OPTIONS="--with-luajit-xcflags='-DLUAJIT_NUMMODE=2 -DLUAJIT_ENABLE_LUA52COMPAT'"
 ARG RESTY_PCRE_OPTIONS="--with-pcre-jit"
 # When RESTY_LUAJIT_REF is set, the bundled LuaJIT is replaced with this repo at this ref
@@ -186,6 +186,15 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
         ${RESTY_PCRE_BUILD_OPTIONS} \
     && CFLAGS="-g -O3" make -j${RESTY_J} \
     && CFLAGS="-g -O3" make -j${RESTY_J} install \
+    #prepare nginx-module-vts
+    && cd /tmp \
+    && git clone https://github.com/vozlt/nginx-module-vts \
+    #prepare nginx-module-sts
+    && cd /tmp \
+    && git clone https://github.com/vozlt/nginx-module-sts \
+    #prepare nginx-module-stream-sts
+    && cd /tmp \
+    && git clone https://github.com/vozlt/nginx-module-stream-sts \
     && cd /tmp \
     && tar xzf "openresty-${RESTY_VERSION}.tar.gz" \
     && mv openresty-*/ "openresty-${RESTY_VERSION}" \
@@ -216,11 +225,18 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
         --with-lua-include=/usr/local/openresty/luajit/include/luajit-2.1 \
     && make build \
     && make install \
+    #lua-resty-balancer
+    && cd /tmp \
+    && git clone https://github.com/openresty/lua-resty-balancer \
+    && cd lua-resty-balancer \
+    && make \
+    && make install \
     && cd /tmp \
     && if [ -n "${RESTY_EVAL_POST_MAKE}" ]; then eval $(echo ${RESTY_EVAL_POST_MAKE}); fi \
     && rm -rf luarocks-${RESTY_LUAROCKS_VERSION} luarocks-${RESTY_LUAROCKS_VERSION}.tar.gz \
     && if [ -n "${RESTY_ADD_PACKAGE_BUILDDEPS}" ]; then DEBIAN_FRONTEND=noninteractive apt-get remove -y --purge ${RESTY_ADD_PACKAGE_BUILDDEPS} ; fi \
     && DEBIAN_FRONTEND=noninteractive apt-get autoremove -y \
+    && rm -rf /tmp/* \
     && mkdir -p /var/run/openresty \
     && ln -sf /dev/stdout /usr/local/openresty/nginx/logs/access.log \
     && ln -sf /dev/stderr /usr/local/openresty/nginx/logs/error.log
